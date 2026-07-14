@@ -1,6 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowRight, MessageCircle, ShieldCheck, Truck, MapPin } from "lucide-react";
+import {
+  ArrowRight,
+  MessageCircle,
+  ShieldCheck,
+  Truck,
+  MapPin,
+  Bike,
+  Footprints,
+  Shirt,
+  BedDouble,
+  Laptop,
+  SprayCan,
+  Watch,
+  Gamepad2,
+  Headphones,
+  Package,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { SiteFooter, SiteHeader } from "@/components/site/header";
 import { ProductCard, type ProductCardData } from "@/components/product/product-card";
@@ -25,6 +43,7 @@ function Index() {
   const [featured, setFeatured] = useState<ProductCardData[]>([]);
   const [latest, setLatest] = useState<ProductCardData[]>([]);
   const [counts, setCounts] = useState({ products: 0 });
+  const [slide, setSlide] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -50,6 +69,19 @@ function Index() {
       setCounts({ products: count ?? 0 });
     })();
   }, []);
+
+  // Carousel source: prefer featured, fall back to latest.
+  const carousel = (featured.length > 0 ? featured : latest).slice(0, 6);
+
+  useEffect(() => {
+    if (carousel.length < 2) return;
+    const t = setInterval(() => setSlide((s) => (s + 1) % carousel.length), 5000);
+    return () => clearInterval(t);
+  }, [carousel.length]);
+
+  useEffect(() => {
+    if (slide >= carousel.length) setSlide(0);
+  }, [carousel.length, slide]);
 
   return (
     <div className="min-h-screen">
@@ -109,31 +141,14 @@ function Index() {
             </dl>
           </div>
 
-          <div className="relative md:col-span-5 lg:col-span-6">
-            <div className="relative grid h-full grid-cols-2 gap-3">
-              {(latest.slice(0, 4)).map((p, i) => (
-                <Link
-                  key={p.id}
-                  to="/producto/$slug"
-                  params={{ slug: p.slug }}
-                  className={`group relative aspect-square overflow-hidden rounded-xl border border-border bg-muted ${
-                    i === 0 ? "row-span-2 aspect-auto" : ""
-                  }`}
-                >
-                  {p.image_url && (
-                    <img src={p.image_url} alt={p.name} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                  )}
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-foreground/70 via-foreground/20 to-transparent p-3">
-                    <p className="line-clamp-2 text-xs font-semibold text-background">{p.name}</p>
-                  </div>
-                </Link>
-              ))}
-              {latest.length === 0 && (
-                <div className="col-span-2 flex aspect-[4/3] items-center justify-center rounded-xl border border-dashed border-border font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                  Sin productos publicados
-                </div>
-              )}
-            </div>
+          <div className="relative md:col-span-5 lg:col-span-6 lg:ml-22">
+            <HeroCarousel
+              items={carousel}
+              index={slide}
+              onSelect={setSlide}
+              onPrev={() => setSlide((s) => (s - 1 + carousel.length) % carousel.length)}
+              onNext={() => setSlide((s) => (s + 1) % carousel.length)}
+            />
           </div>
         </div>
       </section>
@@ -155,8 +170,8 @@ function Index() {
                 search={{ cat: c.slug } as any}
                 className="group flex flex-col items-start gap-3 rounded-lg border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-foreground/30"
               >
-                <div className="flex size-10 items-center justify-center rounded-md bg-foreground font-mono text-xs font-bold text-background">
-                  {c.name.slice(0, 2).toUpperCase()}
+                <div className="flex size-10 items-center justify-center rounded-md bg-foreground text-background transition-colors group-hover:bg-accent group-hover:text-accent-foreground">
+                  <CategoryIcon name={c.name} slug={c.slug} className="size-5" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold">{c.name}</p>
@@ -239,4 +254,137 @@ export function mapCard(row: any): ProductCardData {
     image_url: primary?.url ?? null,
     category_name: row.categories?.name ?? null,
   };
+}
+
+function HeroCarousel({
+  items,
+  index,
+  onSelect,
+  onPrev,
+  onNext,
+}: {
+  items: ProductCardData[];
+  index: number;
+  onSelect: (i: number) => void;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  if (items.length === 0) {
+    return (
+      <div className="flex aspect-[4/5] items-center justify-center rounded-xl border border-dashed border-border font-mono text-xs uppercase tracking-widest text-muted-foreground md:aspect-auto md:h-full md:min-h-[420px]">
+        Sin productos publicados
+      </div>
+    );
+  }
+  const current = items[index] ?? items[0];
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-border bg-muted h-[360px] md:h-[450px]">
+      <div
+        className="flex h-full transition-transform duration-700 ease-out"
+        style={{ transform: `translateX(-${index * 100}%)` }}
+      >
+        {items.map((p) => (
+          <Link
+            key={p.id}
+            to="/producto/$slug"
+            params={{ slug: p.slug }}
+            className="group relative block h-full w-full shrink-0"
+          >
+            {p.image_url ? (
+              <img
+                src={p.image_url}
+                alt={p.name}
+                className="size-full object-cover transition-transform duration-[6000ms] ease-out group-hover:scale-105"
+              />
+            ) : (
+              <div className="flex size-full items-center justify-center bg-muted font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                Sin imagen
+              </div>
+            )}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-gradient-to-t from-foreground/80 via-foreground/40 to-transparent p-5">
+              {p.category_name && (
+                <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-background/80">
+                  {p.category_name}
+                </span>
+              )}
+              <p className="line-clamp-2 text-lg font-extrabold leading-tight tracking-tight text-background md:text-xl">
+                {p.name}
+              </p>
+              <p className="font-mono text-xs text-background/90">
+                ${Number(p.price).toLocaleString("es-CL")}
+              </p>
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      {items.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={onPrev}
+            aria-label="Anterior"
+            className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-background/80 p-2 text-foreground backdrop-blur transition hover:bg-background"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onNext}
+            aria-label="Siguiente"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-background/80 p-2 text-foreground backdrop-blur transition hover:bg-background"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+          <div className="absolute inset-x-0 bottom-3 flex items-center justify-center gap-1.5">
+            {items.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onSelect(i)}
+                aria-label={`Ir a ${i + 1}`}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === index ? "w-6 bg-background" : "w-1.5 bg-background/50 hover:bg-background/80"
+                }`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+      {current && <span className="sr-only">{current.name}</span>}
+    </div>
+  );
+}
+
+function CategoryIcon({
+  name,
+  slug,
+  className,
+}: {
+  name: string;
+  slug: string;
+  className?: string;
+}) {
+  const key = `${slug} ${name}`.toLowerCase();
+  const match = (...terms: string[]) => terms.some((t) => key.includes(t));
+  const Icon = match("bici", "bike", "ciclismo")
+    ? Bike
+    : match("zapat", "zapa", "calza", "sneak", "shoe")
+      ? Footprints
+      : match("ropa", "polera", "camisa", "vestu", "cloth")
+        ? Shirt
+        : match("cama", "colch", "dormi", "bed")
+          ? BedDouble
+          : match("tecno", "tech", "compu", "notebook", "laptop", "celu", "phone")
+            ? Laptop
+            : match("perfume", "fragancia", "aroma")
+              ? SprayCan
+              : match("reloj", "watch")
+                ? Watch
+                : match("audio", "audi", "parlant", "headphone")
+                  ? Headphones
+                  : match("juego", "gamer", "console", "game")
+                    ? Gamepad2
+                    : Package;
+  return <Icon className={className} />;
 }
