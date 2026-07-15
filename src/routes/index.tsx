@@ -364,7 +364,8 @@ function CategoryIcon({
   name: string;
   slug: string;
   className?: string;
-}) {
+}) 
+{
   const key = `${slug} ${name}`.toLowerCase();
   const match = (...terms: string[]) => terms.some((t) => key.includes(t));
   const Icon = match("bici", "bike", "ciclismo")
@@ -387,4 +388,4 @@ function CategoryIcon({
                     ? Gamepad2
                     : Package;
   return <Icon className={className} />;
-}
+} 
