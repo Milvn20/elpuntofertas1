@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Search, ShieldUser, LogOut } from "lucide-react";
+import { FaInstagram } from "react-icons/fa";
 import { supabase } from "@/integrations/supabase/client";
 import { SITE } from "@/lib/site";
 import logo from "@/assets/elpuntofertas.jpg";
@@ -57,6 +58,15 @@ export function SiteHeader() {
               className="w-48 rounded-full bg-muted py-1.5 pl-9 pr-4 text-sm outline-none transition-all focus:w-64 focus:ring-1 focus:ring-accent"
             />
           </form>
+          <a
+            href= {`https://instagram.com/${SITE.instagram}`}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Instagram"
+            className="hidden items-center rounded-full border border-border p-2 text-muted-foreground transition-all hover:-translate-y-0.5 hover:border-foreground/40 hover:text-foreground sm:inline-flex"
+          > 
+            <FaInstagram className="size-3.5" />
+           </a>
           {signedIn ? (
             <>
               <Link

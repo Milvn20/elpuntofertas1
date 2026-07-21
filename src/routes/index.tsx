@@ -104,7 +104,7 @@ function Index() {
             </h1>
             <p className="mt-6 max-w-lg text-balance text-base text-muted-foreground md:text-lg">
               Bicicletas, zapatillas, ropa, camas, tecnología y perfumes. Cada producto que ves
-              está físicamente en bodega — preguntas y compras se cierran por WhatsApp.
+              está físicamente en bodega — preguntas y compras se cordinan via WhatsApp.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link

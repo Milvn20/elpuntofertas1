@@ -3,6 +3,9 @@ export const SITE = {
   tagline: "Ofertas reales, stock real",
   city: "Santiago, Chile",
   whatsapp: "56956509004",
+  instagram: "elpuntofertas",
+  hours: "Lun a Sáb · 10:00 – 20:00",
+  shippingBanner: "🚚 Envío gratis en compras superior a los 20.000 CLP • Consulta disponibilidad vía WhatsApp",
 } as const;
 
 export function whatsappLink(productName: string) {
