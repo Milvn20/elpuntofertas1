@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { return isSignedIn() && request.auth.token.admin == true; }
+
+    function validProduct(data) {
+      return data.name is string
+        && data.name.size() > 1
+        && data.name.size() < 200
+        && data.slug is string
+        && data.price is number
+        && data.price >= 0
+        && data.stock is number
+        && data.stock >= 0
+        && data.active is bool
+        && data.featured is bool
+        && (data.previousPrice == null || (data.previousPrice is number && data.previousPrice > data.price));
+    }
+
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.role == 'user'
+        && request.resource.data.active == true
+        && request.resource.data.email is string
+        && request.resource.data.name is string;
+      allow update: if isAdmin() || (
+        request.auth.uid == uid
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'lastLoginAt'])
+      );
+      allow delete: if false;
+    }
+
+    match /categories/{id} {
+      allow read: if resource.data.active == true || isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.slug is string
+        && request.resource.data.active is bool
+        && request.resource.data.displayOrder is number;
+      allow delete: if isAdmin();
+    }
+
+    match /products/{id} {
+      allow read: if resource.data.active == true || isAdmin();
+      allow create: if isAdmin() && validProduct(request.resource.data);
+      allow update: if isAdmin() && (
+        validProduct(request.resource.data)
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'updatedAt'])
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['categoryName', 'categorySlug', 'updatedAt'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /orders/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    match /auditLogs/{id} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+  }
+}
