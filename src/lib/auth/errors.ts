@@ -4,8 +4,8 @@ export function authErrorMessage(err: unknown): string {
   }
   const e = err as { code?: string; message?: string };
   if (e?.code) return firebaseAuthMessage(e.code);
-  if (e?.message?.includes("Failed to fetch")) {
-    return "Error de red al registrar la cuenta. Si usas Supabase, verifica que el proyecto no esté pausado en el panel de Lovable/Supabase.";
+  if (e?.message?.includes("Failed to fetch") || e?.message?.includes("auth/network-request-failed")) {
+    return "No hay conexión con Firebase. Revisa tu internet y que Authentication con correo esté activo en el proyecto.";
   }
   return e?.message ?? "No se pudo completar la autenticación.";
 }

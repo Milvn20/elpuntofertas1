@@ -4,6 +4,17 @@ function readEnv(k: string): string | undefined {
   return undefined;
 }
 
+/** Claves públicas de la app web. No son secretos: Firebase las entrega al navegador. */
+const CLOUD_WEB_CONFIG = {
+  apiKey: "AIzaSyA5iCIFb9rlxQKAxi-pT4bzrr-TbI5tbcE",
+  authDomain: "elpuntofertas.firebaseapp.com",
+  projectId: "elpuntofertas",
+  storageBucket: "elpuntofertas.firebasestorage.app",
+  messagingSenderId: "1015786318917",
+  appId: "1:1015786318917:web:e24ffc7d5bdaa0248c072c",
+  measurementId: "G-NGJ31C5CB2",
+};
+
 export function getFirebaseWebConfig() {
   const apiKey = readEnv("VITE_FIREBASE_API_KEY");
   const authDomain = readEnv("VITE_FIREBASE_AUTH_DOMAIN");
@@ -11,19 +22,19 @@ export function getFirebaseWebConfig() {
   const storageBucket = readEnv("VITE_FIREBASE_STORAGE_BUCKET");
   const messagingSenderId = readEnv("VITE_FIREBASE_MESSAGING_SENDER_ID");
   const appId = readEnv("VITE_FIREBASE_APP_ID");
-  // Todas las claves son obligatorias; si falta una, usamos Supabase y evitamos "Failed to fetch".
-  if (!apiKey || !authDomain || !projectId || !storageBucket || !messagingSenderId || !appId) {
-    return null;
+  if (apiKey && authDomain && projectId && storageBucket && messagingSenderId && appId) {
+    return {
+      apiKey,
+      authDomain,
+      projectId,
+      storageBucket,
+      messagingSenderId,
+      appId,
+      measurementId: readEnv("VITE_FIREBASE_MEASUREMENT_ID"),
+    };
   }
-  return {
-    apiKey,
-    authDomain,
-    projectId,
-    storageBucket,
-    messagingSenderId,
-    appId,
-    measurementId: readEnv("VITE_FIREBASE_MEASUREMENT_ID"),
-  };
+  if (apiKey || authDomain || projectId || storageBucket || messagingSenderId || appId) return null;
+  return CLOUD_WEB_CONFIG;
 }
 
 export function getAppCheckSiteKey() {

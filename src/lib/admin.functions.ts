@@ -227,3 +227,32 @@ export const appendAuditLog = createServerFn({ method: "POST" })
     });
     return { ok: true as const };
   });
+
+/** En el Firebase local, la primera cuenta recibe el claim admin. En la nube este atajo no existe. */
+export const bootstrapEmulatorAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .handler(async ({ context }) => {
+    const { firebaseEmulatorsEnabled, getFirebaseAdminAuth, getFirebaseAdminDb } = await import("@/integrations/firebase/admin.server");
+    if (!firebaseEmulatorsEnabled() || !useFirebaseBackend()) {
+      return { ok: false as const, reason: "cloud" as const };
+    }
+    const auth = getFirebaseAdminAuth();
+    const me = await auth.getUser(context.userId);
+    if (me.customClaims?.admin === true) return { ok: true as const, reason: "already" as const };
+    const listed = await auth.listUsers(1000);
+    const otherAdmin = listed.users.some((user) => user.uid !== context.userId && user.customClaims?.admin === true);
+    if (otherAdmin) return { ok: false as const, reason: "taken" as const };
+    await auth.setCustomUserClaims(context.userId, { admin: true });
+    const { FieldValue } = await import("firebase-admin/firestore");
+    await getFirebaseAdminDb().collection("users").doc(context.userId).set(
+      {
+        uid: context.userId,
+        email: context.email,
+        role: "admin",
+        active: true,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+    return { ok: true as const, reason: "granted" as const };
+  });

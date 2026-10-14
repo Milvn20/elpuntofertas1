@@ -16,21 +16,10 @@ function hasSupabaseEnv(): boolean {
   return !!(readEnv("VITE_SUPABASE_URL") && readEnv("VITE_SUPABASE_PUBLISHABLE_KEY"));
 }
 
-/** Firebase tiene prioridad si está completo. Supabase pausado no bloquea si Firebase existe. */
+/** Las cuentas y el catálogo viven en Firebase. Supabase pausado no se usa si Firebase está listo. */
 export function getDataBackend(): DataBackend {
-  const forced = readEnv("VITE_DATA_BACKEND")?.toLowerCase();
-  const firebaseReady = getFirebaseWebConfig() !== null;
-  const supabaseReady = hasSupabaseEnv();
-
-  if (forced === "firebase") {
-    if (firebaseReady) return "firebase";
-    if (supabaseReady) return "supabase";
-    return "none";
-  }
-  if (forced === "supabase" && supabaseReady) return "supabase";
-
-  if (firebaseReady) return "firebase";
-  if (supabaseReady) return "supabase";
+  if (getFirebaseWebConfig()) return "firebase";
+  if (hasSupabaseEnv() && readEnv("VITE_DATA_BACKEND")?.toLowerCase() !== "firebase") return "supabase";
   return "none";
 }
 
