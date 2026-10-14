@@ -57,6 +57,24 @@ export const redeemAdminCode = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+/** Solo desarrollo local: con emuladores de Firebase activos, convierte al usuario actual en administrador. */
+export const bootstrapEmulatorAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .handler(async ({ context }) => {
+    if (!useFirebaseBackend()) return { ok: false as const };
+    const { firebaseEmulatorsEnabled, getFirebaseAdminAuth, getFirebaseAdminDb } = await import(
+      "@/integrations/firebase/admin.server"
+    );
+    if (!firebaseEmulatorsEnabled()) return { ok: false as const };
+    const { FieldValue } = await import("firebase-admin/firestore");
+    await getFirebaseAdminAuth().setCustomUserClaims(context.userId, { admin: true });
+    await getFirebaseAdminDb().collection("users").doc(context.userId).set(
+      { role: "admin", updatedAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+    return { ok: true as const };
+  });
+
 export type AdminUserRow = {
   id: string;
   email: string | null;
