@@ -4,10 +4,11 @@ import { Lock, Mail, ArrowLeft, KeyRound, User } from "lucide-react";
 import { toast } from "sonner";
 import { SITE } from "@/lib/site";
 import { useServerFn } from "@tanstack/react-start";
-import { redeemAdminCode } from "@/lib/admin.functions";
+import { bootstrapEmulatorAdmin, redeemAdminCode } from "@/lib/admin.functions";
 import { getCurrentSession, signIn, signUp, resetPassword } from "@/lib/auth/client";
 import { authErrorMessage } from "@/lib/auth/errors";
 import { backendSetupMessage, getDataBackend, useFirebaseBackend } from "@/lib/data/backend";
+import { useFirebaseEmulators } from "@/integrations/firebase/config";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: `Acceso · ${SITE.name}` }] }),
@@ -23,6 +24,7 @@ function AuthPage() {
   const [adminCode, setAdminCode] = useState("");
   const [loading, setLoading] = useState(false);
   const redeem = useServerFn(redeemAdminCode);
+  const bootstrapAdmin = useServerFn(bootstrapEmulatorAdmin);
 
   useEffect(() => {
     getCurrentSession()
@@ -35,6 +37,20 @@ function AuthPage() {
   }, [navigate]);
 
   async function afterAuth(isSignup: boolean) {
+    if (useFirebaseEmulators()) {
+      try {
+        const boot = await bootstrapAdmin();
+        const { getFirebaseAuth } = await import("@/integrations/firebase/client");
+        await getFirebaseAuth().currentUser?.getIdToken(true);
+        if (boot.ok) {
+          toast.success("Entraste como administrador");
+          navigate({ to: "/admin" });
+          return;
+        }
+      } catch (e: any) {
+        toast.error(e?.message ?? "No se pudo activar el administrador. Enciende Firebase con npm run emulators.");
+      }
+    }
     const { isAdmin } = await getCurrentSession();
     if (isSignup && adminCode.trim()) {
       try {
@@ -105,6 +121,11 @@ function AuthPage() {
               <strong>Supabase pausado:</strong> {backendSetupMessage()} Guía completa:{" "}
               <code className="text-[10px]">docs/FIREBASE-SETUP.md</code>
             </div>
+          )}
+          {useFirebaseEmulators() && (
+            <p className="rounded-lg border border-border bg-muted/50 p-3 text-xs leading-relaxed">
+              Firebase local activo. La primera cuenta que inicie sesión queda como administradora y los productos se guardan en ese Firebase.
+            </p>
           )}
           <h1 className="text-3xl font-extrabold tracking-tighter">
             {mode === "login" ? "Ingresar" : mode === "signup" ? "Crear cuenta" : "Recuperar contraseña"}
