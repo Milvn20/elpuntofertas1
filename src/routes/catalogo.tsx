@@ -71,10 +71,10 @@ function Catalogo() {
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <section className="border-b border-border bg-muted/40">
-        <div className="mx-auto max-w-7xl px-4 py-10 md:px-6">
+      <section className="border-b border-border">
+        <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
           <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">/ Catálogo</p>
-          <h1 className="mt-2 text-4xl font-extrabold tracking-tighter md:text-5xl">
+          <h1 className="mt-2 text-3xl font-extrabold tracking-tighter md:text-4xl">
             {params.cat ? cats.find((c) => c.slug === params.cat)?.name ?? "Catálogo" : "Todo el inventario"}
           </h1>
           <p className="mt-2 text-muted-foreground">
@@ -146,7 +146,7 @@ function Catalogo() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
                   {items.slice(0, page * 12).map((p) => <ProductCard key={p.id} p={p} />)}
                 </div>
                 {page * 12 < items.length && (

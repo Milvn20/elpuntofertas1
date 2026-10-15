@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { useFirebaseBackend } from "@/lib/data/backend";
 import { assertAdminContext, requireAuth } from "@/lib/require-auth.middleware";
+import { formatShippingAddress, parseShippingAddress, type ShippingAddress } from "@/lib/orders/address";
 import { isUuid, orderSummaryText, quoteOrder, type Fulfillment, type PricedProduct, type QuoteLineRequest } from "@/lib/orders/pricing";
 
 const attempts = new Map<string, { count: number; at: number }>();
@@ -34,20 +35,24 @@ type CreateOrderInput = {
   customerEmail: string;
   customerPhone: string;
   fulfillment: Fulfillment;
+  shippingAddress: ShippingAddress | null;
   items: QuoteLineRequest[];
 };
 
 function parseCreateOrder(data: CreateOrderInput): CreateOrderInput {
-  const name = data?.customerName?.trim() ?? "";
   const email = data?.customerEmail?.trim().toLowerCase() ?? "";
   const phone = data?.customerPhone?.trim() ?? "";
   const clientRequestId = data?.clientRequestId?.trim() ?? "";
   if (!isUuid(clientRequestId)) throw new Error("No se pudo identificar el intento de pedido.");
-  if (name.length < 2 || name.length > 120) throw new Error("Escribe un nombre de contacto válido.");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("El correo no es válido.");
   const digits = phone.replace(/\D/g, "");
   if (digits.length < 8 || digits.length > 15) throw new Error("El teléfono no es válido.");
   if (data.fulfillment !== "retiro" && data.fulfillment !== "despacho") throw new Error("Elige retiro o despacho.");
+  const shippingAddress = data.fulfillment === "despacho" ? parseShippingAddress(data.shippingAddress) : null;
+  const name = shippingAddress
+    ? `${shippingAddress.firstName} ${shippingAddress.lastName}`
+    : (data?.customerName?.trim() ?? "");
+  if (name.length < 2 || name.length > 120) throw new Error("Escribe un nombre de contacto válido.");
   if (!Array.isArray(data.items) || data.items.length === 0) throw new Error("El carrito está vacío.");
   return {
     clientRequestId,
@@ -55,6 +60,7 @@ function parseCreateOrder(data: CreateOrderInput): CreateOrderInput {
     customerEmail: email,
     customerPhone: phone,
     fulfillment: data.fulfillment,
+    shippingAddress,
     items: data.items.map((item) => ({
       productId: String(item?.productId ?? ""),
       quantity: Number(item?.quantity),
@@ -83,11 +89,29 @@ export const createOrder = createServerFn({ method: "POST" })
     if (!useFirebaseBackend()) {
       throw new Error("Los pedidos se registran solo en Firebase. Configura el proyecto antes de confirmar una compra.");
     }
-    const { getFirebaseAdminDb } = await import("@/integrations/firebase/admin.server");
+    let db;
+    try {
+      const { getFirebaseAdminDb } = await import("@/integrations/firebase/admin.server");
+      db = getFirebaseAdminDb();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (/default credentials|Could not load|credential/i.test(message)) {
+        throw new Error("No se pudo guardar el pedido: el servidor no tiene credenciales de Firebase. El carrito sigue intacto.");
+      }
+      throw err;
+    }
     const { FieldValue } = await import("firebase-admin/firestore");
-    const db = getFirebaseAdminDb();
     const ref = db.collection("orders").doc(data.clientRequestId);
-    const existing = await ref.get();
+    let existing;
+    try {
+      existing = await ref.get();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (/default credentials|Could not load|Could not refresh/i.test(message)) {
+        throw new Error("No se pudo guardar el pedido: el servidor no tiene credenciales de Firebase. El carrito sigue intacto.");
+      }
+      throw err;
+    }
     if (existing.exists) {
       const saved = existing.data() ?? {};
       return {
@@ -130,6 +154,7 @@ export const createOrder = createServerFn({ method: "POST" })
       customerEmail: data.customerEmail,
       customerPhone: data.customerPhone,
       fulfillment: quote.fulfillment,
+      shippingAddress: data.shippingAddress,
       items: quote.items,
       subtotal: quote.subtotal,
       shippingCost: quote.shippingCost,
@@ -168,6 +193,7 @@ export const createOrder = createServerFn({ method: "POST" })
         shippingNote: quote.shippingNote,
         total: quote.total,
         fulfillment: quote.fulfillment,
+        address: data.shippingAddress ? formatShippingAddress(data.shippingAddress) : null,
         orderId: ref.id,
         registered: true,
       }),

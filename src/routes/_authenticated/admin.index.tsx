@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Boxes, Eye, Plus, AlertTriangle, FolderTree, ClipboardList } from "lucide-react";
+import { Boxes, Eye, Plus, AlertTriangle, ClipboardList } from "lucide-react";
 import { formatCLP } from "@/lib/site";
-import { adminListAudit, adminListCategories, adminListOrders, adminListProducts } from "@/lib/data/admin";
+import { adminListCategories, adminListOrders, adminListProducts } from "@/lib/data/admin";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   component: AdminHome,
@@ -14,24 +14,21 @@ function AdminHome() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [orders, setOrders] = useState(0);
-  const [activity, setActivity] = useState(0);
   const [lowStockItems, setLowStockItems] = useState<Array<{ id: string; name: string; stock: number; minStock: number }>>([]);
 
   useEffect(() => {
     (async () => {
       try {
-        const [products, categories, orderRows, auditRows] = await Promise.all([
+        const [products, categories, orderRows] = await Promise.all([
           adminListProducts(),
           adminListCategories(),
           adminListOrders().catch(() => []),
-          adminListAudit(8).catch(() => []),
         ]);
         const active = products.filter((p) => p.active).length;
         const totalValue = products.reduce((acc, p) => acc + Number(p.price) * Number(p.stock), 0);
         const lowStock = products.filter((p) => p.stock <= p.minStock).length;
         setStats({ products: products.length, active, categories: categories.length, lowStock, totalValue });
         setOrders(orderRows.length);
-        setActivity(auditRows.length);
         setLowStockItems(
           products.filter((p) => p.stock <= p.minStock).sort((a, b) => a.stock - b.stock).slice(0, 10)
             .map((p) => ({ id: p.id, name: p.name, stock: p.stock, minStock: p.minStock })),
@@ -55,7 +52,7 @@ function AdminHome() {
         <Stat label="Productos activos" value={stats?.active ?? "—"} icon={<Eye className="size-4" />} />
         <Stat label="Stock bajo" value={stats?.lowStock ?? "—"} icon={<AlertTriangle className="size-4" />} />
         <Stat label="Pedidos recientes" value={stats ? orders : "—"} icon={<ClipboardList className="size-4" />} />
-        <Stat label="Actividad reciente" value={stats ? activity : "—"} icon={<FolderTree className="size-4" />} />
+        <Stat label="Valor inventario" value={stats ? formatCLP(stats.totalValue) : "—"} icon={<Boxes className="size-4" />} />
       </div>
       {stats && <p className="text-sm text-muted-foreground">Inventario total: {stats.products} productos · valor {formatCLP(stats.totalValue)} · {stats.categories} categorías</p>}
       <div className="grid gap-6 md:grid-cols-2">

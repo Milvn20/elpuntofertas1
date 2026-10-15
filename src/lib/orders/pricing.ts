@@ -183,6 +183,7 @@ export function orderSummaryText(input: {
   shippingNote: string;
   total: number;
   fulfillment: Fulfillment;
+  address?: string | null;
   orderId?: string;
   registered: boolean;
 }): string {
@@ -194,6 +195,7 @@ export function orderSummaryText(input: {
     header,
     `Nombre: ${input.customerName}`,
     `Entrega: ${input.fulfillment === "retiro" ? "Retiro" : "Despacho"}`,
+    ...(input.address ? [`Dirección: ${input.address}`] : []),
     ...lines,
     `Subtotal productos: $${input.subtotal.toLocaleString("es-CL")}`,
     input.shippingNote,

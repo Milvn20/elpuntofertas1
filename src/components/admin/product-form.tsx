@@ -227,8 +227,9 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 p-6 text-sm font-semibold transition-colors hover:bg-muted"
             >
               {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-              {uploading ? "Subiendo…" : "Subir imágenes"}
+              {uploading ? "Preparando foto…" : "Subir imágenes"}
             </button>
+            <p className="text-xs text-muted-foreground">Elige la foto desde tu computador. Queda guardada en la base de datos del producto y se ve en el catálogo.</p>
             {images.length > 0 && (
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {images.map((img, i) => (

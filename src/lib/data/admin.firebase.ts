@@ -12,7 +12,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { deleteObject, ref } from "firebase/storage";
 import { getFirebaseDb, getFirebaseStorage } from "@/integrations/firebase/client";
 import type { CategoryRecord, ProductImage, ProductRecord } from "@/lib/db/types";
 import { firestoreDocToProduct } from "@/lib/db/mappers";
@@ -84,6 +84,8 @@ export async function adminSaveProduct(input: SaveProductInput): Promise<string>
   const dup = await getDocs(query(collection(db, "products"), where("slug", "==", input.slug)));
   const conflict = dup.docs.find((d) => d.id !== input.id);
   if (conflict) throw new Error("Ya existe un producto con ese slug");
+  const photoWeight = input.images.reduce((total, img) => total + img.url.length, 0);
+  if (photoWeight > 750_000) throw new Error("Las fotos ocupan demasiado. Deja hasta 3 imágenes por producto.");
 
   const cat = await categoryMeta(input.categoryId ?? null);
   if (input.categoryId && !cat.categorySlug) throw new Error("La categoría seleccionada no existe.");
@@ -102,7 +104,7 @@ export async function adminSaveProduct(input: SaveProductInput): Promise<string>
     previousPrice: input.previousPrice ?? null,
     stock,
     minStock,
-    additionalImages: images.filter((img) => !img.isPrimary).map((img) => img.url),
+    additionalImages: images.filter((img) => !img.isPrimary && !img.url.startsWith("data:")).map((img) => img.url),
     internalCode: input.internalCode ?? null,
     featured: input.featured,
     active: input.active,
@@ -148,12 +150,45 @@ export async function adminDeleteProduct(id: string) {
 export async function adminUploadProductImage(file: File): Promise<ProductImage> {
   const invalid = validateImageFile(file);
   if (invalid) throw new Error(invalid);
-  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : file.type === "image/gif" ? "gif" : "jpg";
-  const path = `product-images/${crypto.randomUUID()}.${ext}`;
-  const storage = getFirebaseStorage();
-  await uploadBytes(ref(storage, path), file, { contentType: file.type });
-  const url = await getDownloadURL(ref(storage, path));
-  return { url, storagePath: path, sortOrder: 0, isPrimary: false };
+  const url = await compressProductPhoto(file);
+  return { url, storagePath: null, sortOrder: 0, isPrimary: false };
+}
+
+function compressProductPhoto(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const maxSide = 1200;
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("No se pudo preparar la imagen"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      let quality = 0.82;
+      let data = canvas.toDataURL("image/jpeg", quality);
+      while (data.length > 180_000 && quality > 0.45) {
+        quality -= 0.08;
+        data = canvas.toDataURL("image/jpeg", quality);
+      }
+      if (data.length > 220_000) {
+        reject(new Error("La foto sigue siendo muy pesada. Prueba con otra imagen."));
+        return;
+      }
+      resolve(data);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("No se pudo leer la imagen"));
+    };
+    img.src = objectUrl;
+  });
 }
 
 export async function adminListCategories(): Promise<CategoryRecord[]> {

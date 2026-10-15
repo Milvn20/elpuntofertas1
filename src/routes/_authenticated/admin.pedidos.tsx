@@ -80,6 +80,11 @@ function OrdersAdmin() {
                 <div>
                   <p className="font-semibold">{order.customerName}</p>
                   <p className="text-xs text-muted-foreground">{order.customerEmail} · {order.customerPhone}</p>
+                  {order.shippingAddress?.line1 && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {order.shippingAddress.line1}{order.shippingAddress.line2 ? `, ${order.shippingAddress.line2}` : ""}, {order.shippingAddress.city}, {order.shippingAddress.region}
+                    </p>
+                  )}
                   <p className="mt-1 font-mono text-[10px] text-muted-foreground">{order.id}</p>
                 </div>
                 <div className="text-right">
