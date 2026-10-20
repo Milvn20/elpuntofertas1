@@ -105,9 +105,14 @@ Al registrar un pedido, la función de servidor `createOrder`:
 3. Calcula subtotal y total en el servidor.
 4. Guarda el pedido con estado `pending` y `paymentStatus: unpaid`.
 5. No descuenta stock. El inventario se reserva o descuenta solo cuando definas esa política en la operación de la tienda.
-6. No cobra. El pago queda para una integración futura de Mercado Pago o Webpay.
+6. Si el cliente elige Mercado Pago, el servidor crea una preferencia de Checkout Pro con esos precios y redirige al checkout de Mercado Pago. La tarjeta no se escribe en la tienda.
+7. Al volver, y también por el webhook `POST /api/mercadopago/webhook`, el servidor consulta el pago en la API de Mercado Pago. Solo marca `paymentStatus: paid` y pasa el pedido a `confirmed` si el pago está `approved`, el monto coincide y `external_reference` es el id del pedido. Una URL de éxito no alcanza. Una notificación sin la firma `x-signature` se rechaza. La misma notificación no se aplica dos veces.
 
-Retiro: despacho 0. Despacho desde $20.000: costo 0, según el aviso que ya existía en el sitio. Bajo ese monto el costo de despacho no se inventa: queda por confirmar en WhatsApp y no entra en el total.
+Variables de servidor, nunca en el frontend: `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET` y `SITE_URL`. La Public Key no se usa en este flujo de redirección. En Netlify configúralas en Site settings → Environment variables. El webhook a registrar es `https://TU-DOMINIO/api/mercadopago/webhook`. Las vueltas de éxito, pendiente y fallo usan `https://TU-DOMINIO/pago/resultado`.
+
+El webhook vive en el servidor de la aplicación, en `POST /api/mercadopago/webhook`, no en una función suelta de `netlify/functions`. El build con preset Netlify incluye ese servidor. No está verificado un despliegue productivo.
+
+Retiro: despacho 0. Despacho desde $20.000: costo 0. En compras menores a $20.000 el despacho cuesta $3.000 y entra en el total que cobra Mercado Pago.
 
 ## Migración desde Supabase
 
@@ -147,7 +152,7 @@ Puertos: Auth 9099, Firestore 8080, Storage 9199, UI 4000.
 
 ## Despliegue
 
-El build de producción usa Nitro con destino Cloudflare, la configuración que ya traía el proyecto Lovable:
+El build local y el de Netlify usan Nitro con preset `netlify`. El sitio estático queda en `dist` y el servidor, incluido el webhook, en la función interna de Netlify. Dentro del sandbox de Lovable el destino sigue siendo Cloudflare. Este cambio no se desplegó ni se probó contra un sitio publicado.
 
 ```powershell
 npm run build
@@ -157,7 +162,7 @@ En el hosting debes definir las mismas variables. `FIREBASE_SERVICE_ACCOUNT_JSON
 
 ## Qué está implementado y qué falta
 
-Implementado en código: Firebase como backend preferido, servicios de catálogo y admin, autenticación, carrito, registro de pedidos en servidor, panel, reglas, índices, script de migración y pruebas de la lógica de precios.
+Implementado en código: Firebase como backend preferido, servicios de catálogo y admin, autenticación, carrito, registro de pedidos en servidor, Checkout Pro de Mercado Pago, panel, reglas, índices, script de migración y pruebas de precios y de la decisión de pago.
 
 Pendiente de tu configuración y de una ejecución real:
 
@@ -167,7 +172,7 @@ Pendiente de tu configuración y de una ejecución real:
 - Crear el primer administrador.
 - Probar el catálogo con productos reales.
 - App Check en la consola, si quieres exigirlo después en las reglas.
-- Pasarela de pago. No está simulada.
+- Probar un pago real o de prueba de punta a punta. El token de prueba de la aplicación responde 403 al crear la preferencia; el token de producción no se usó en las pruebas.
 - Copia física de las imágenes de Supabase Storage a Firebase Storage.
 - Retirar la dependencia `@supabase/supabase-js` solo después de verificar la migración. Hoy sigue en el proyecto para el script y el respaldo.
 

@@ -41,6 +41,13 @@ describe("cotización de pedido", () => {
     expect(result.quote.total).toBe(30000);
   });
 
+  it("rechaza un producto que no está en el catálogo", () => {
+    const result = quoteOrder([{ productId: "no-existe", quantity: 1, expectedUnitPrice: 1000 }], new Map(), "retiro");
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe("unavailable");
+  });
+
   it("detiene el pedido si el precio esperado no coincide", () => {
     const result = quoteOrder(
       [{ productId: "p1", quantity: 1, expectedUnitPrice: 1000 }],
@@ -61,14 +68,15 @@ describe("cotización de pedido", () => {
     expect(result.quote?.items[0]?.quantity).toBe(2);
   });
 
-  it("deja el despacho fuera del total cuando no hay tarifa definida", () => {
-    const cheap = { ...bike, price: 5000, stock: 1 };
-    const result = quoteOrder([{ productId: "p1", quantity: 1, expectedUnitPrice: 5000 }], new Map([[cheap.id, cheap]]), "despacho");
+  it("cobra el despacho base bajo el umbral y lo deja gratis al superarlo", () => {
+    const cheap = { ...bike, price: 10000, stock: 1 };
+    const result = quoteOrder([{ productId: "p1", quantity: 1, expectedUnitPrice: 10000 }], new Map([[cheap.id, cheap]]), "despacho");
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.quote.shippingCost).toBeNull();
-    expect(result.quote.total).toBe(5000);
-    expect(shippingFor(25000, "despacho").cost).toBe(0);
+    expect(result.quote.shippingCost).toBe(3000);
+    expect(result.quote.total).toBe(13000);
+    expect(shippingFor(100_001, "despacho").cost).toBe(0);
+    expect(shippingFor(100_001, "retiro").cost).toBe(0);
   });
 
   it("solo calcula descuento con un precio anterior real y mayor", () => {

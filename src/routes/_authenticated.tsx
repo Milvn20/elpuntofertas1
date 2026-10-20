@@ -1,6 +1,6 @@
 import { Outlet, Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Boxes, ClipboardList, FolderTree, Home, LogOut, Package, Plus, ScrollText, Users } from "lucide-react";
+import { Boxes, Calculator, ClipboardList, FolderTree, Home, LogOut, Package, Plus, ScrollText, Users } from "lucide-react";
 import { SITE } from "@/lib/site";
 import { getCurrentSession, signOut } from "@/lib/auth/client";
 
@@ -57,6 +57,7 @@ function AuthedLayout() {
           <NavItem to="/admin/productos" icon={<Package className="size-4" />} label="Productos" />
           <NavItem to="/admin/productos/nuevo" icon={<Plus className="size-4" />} label="Nuevo producto" />
           <NavItem to="/admin/categorias" icon={<FolderTree className="size-4" />} label="Categorías" />
+          <NavItem to="/admin/precios" icon={<Calculator className="size-4" />} label="Precios" />
           <NavItem to="/admin/pedidos" icon={<ClipboardList className="size-4" />} label="Pedidos" />
           <NavItem to="/admin/actividad" icon={<ScrollText className="size-4" />} label="Actividad" />
           <NavItem to="/admin/usuarios" icon={<Users className="size-4" />} label="Usuarios" />
@@ -71,7 +72,10 @@ function AuthedLayout() {
       </aside>
       <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3 md:hidden">
         <Link to="/admin" className="font-extrabold uppercase tracking-tighter">{SITE.name}</Link>
-        <button onClick={logout} className="text-xs font-semibold underline">Salir</button>
+        <div className="flex items-center gap-3">
+          <Link to="/admin/precios" className="text-xs font-semibold">Precios</Link>
+          <button onClick={logout} className="text-xs font-semibold underline">Salir</button>
+        </div>
       </header>
       <main className="min-w-0">
         <div className="p-5 md:p-8"><Outlet /></div>

@@ -5,10 +5,8 @@ export const SITE = {
   whatsapp: "56956509004",
   instagram: "elpuntofertas",
   hours: "Lun a Sáb · 10:00 – 20:00",
-  shippingBanner: "🚚 Envío gratis en compras superior a los 20.000 CLP • Consulta disponibilidad vía WhatsApp",
+  shippingBanner: "🚚 Despacho gratis en compras sobre $100.000",
 } as const;
-
-export const FREE_SHIPPING_MIN_CLP = 20_000;
 
 export function whatsappLink(productName: string) {
   const message = `Hola, vi este producto en su página web:\n\n${productName}\n\nQuisiera consultar si aún tiene stock disponible, cuál es el método de pago y cómo funciona la entrega o retiro.\n\nQuedo atento. Gracias.`;

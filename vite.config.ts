@@ -12,4 +12,6 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Fuera de Lovable el despliegue es Netlify. Dentro del sandbox de Lovable el preset vuelve a Cloudflare.
+  nitro: { preset: "netlify" },
 });

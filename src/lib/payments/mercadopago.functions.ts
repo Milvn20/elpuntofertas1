@@ -1,27 +1,27 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-
-type OrderItem = {
-  productId?: string;
-  name?: string;
-  quantity?: number;
-  unitPrice?: number;
-};
+import {
+  buildPreferenceItems,
+  checkoutUrlFor,
+  isMercadoPagoConfigured,
+  resolveSiteOrigin,
+  preferenceRedirect,
+} from "@/lib/payments/mercadopago-core";
+import { applyMercadoPagoPayment, fetchMercadoPagoPayment } from "@/lib/payments/webhook.server";
 
 function accessToken() {
   return process.env.MERCADOPAGO_ACCESS_TOKEN?.trim() || "";
 }
 
 function siteOrigin() {
-  const configured = process.env.PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
-  if (configured) return configured;
-  const origin = getRequest()?.headers?.get("origin") ?? "";
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin;
-  return "http://localhost:8080";
+  return resolveSiteOrigin(
+    { SITE_URL: process.env.SITE_URL, PUBLIC_SITE_URL: process.env.PUBLIC_SITE_URL },
+    getRequest()?.headers?.get("origin") ?? null,
+  );
 }
 
 export const mercadoPagoConfigured = createServerFn({ method: "GET" }).handler(async () => {
-  return { configured: accessToken().length > 0 };
+  return { configured: isMercadoPagoConfigured(accessToken()) };
 });
 
 export const createMercadoPagoCheckout = createServerFn({ method: "POST" })
@@ -48,85 +48,81 @@ export const createMercadoPagoCheckout = createServerFn({ method: "POST" })
     if (order.paymentStatus === "paid") {
       return { ok: false as const, message: "Este pedido ya figura como pagado." };
     }
+    const savedCheckout = order.mercadoPagoCheckoutUrl;
+    if (typeof savedCheckout === "string" && savedCheckout.startsWith("https://")) {
+      return { ok: true as const, checkoutUrl: savedCheckout };
+    }
     if (order.shippingCost == null) {
       return {
         ok: false as const,
         message: "El despacho de este pedido aún no tiene un monto. Elige retiro o coordina el envío por WhatsApp.",
       };
     }
-    const lines = (Array.isArray(order.items) ? order.items : []) as OrderItem[];
-    const items = lines.map((line) => ({
-      id: String(line.productId ?? "").slice(0, 60),
-      title: String(line.name ?? "Producto").slice(0, 120),
-      quantity: Math.max(1, Math.trunc(Number(line.quantity ?? 1))),
-      unit_price: Math.round(Number(line.unitPrice ?? 0)),
-      currency_id: "CLP",
-    }));
-    const shipping = Math.round(Number(order.shippingCost ?? 0));
-    if (shipping > 0) {
-      items.push({ id: "despacho", title: "Despacho", quantity: 1, unit_price: shipping, currency_id: "CLP" });
-    }
-    if (items.length === 0 || items.some((item) => item.unit_price < 0)) {
-      return { ok: false as const, message: "El pedido no tiene montos válidos para cobrar." };
-    }
+    const built = buildPreferenceItems(order);
+    if (!built.ok) return { ok: false as const, message: "El pedido no tiene montos válidos para cobrar." };
+    const items = built.items;
 
     const origin = siteOrigin();
+    const { loadCommerceSettings } = await import("@/lib/commerce/settings.server");
+    const commerce = await loadCommerceSettings();
+    const installmentCount = commerce.showInstallments ? commerce.installmentCount : 1;
     const delivery = order.shippingAddress && typeof order.shippingAddress === "object"
       ? order.shippingAddress as Record<string, string>
       : null;
-    const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
+    const preferenceBody = (withInstallments: boolean) => ({
+      items,
+      payer: {
+        name: String(delivery?.firstName || order.customerName || "").slice(0, 80),
+        surname: String(delivery?.lastName || "").slice(0, 80),
+        phone: { number: String(order.customerPhone ?? "").replace(/\D/g, "").slice(0, 15) },
+        ...(delivery ? {
+          address: {
+            street_name: String(delivery.line1 || "").slice(0, 80),
+            zip_code: String(delivery.postalCode || "").slice(0, 12),
+          },
+        } : {}),
+      },
+      ...(delivery ? {
+        shipments: {
+          receiver_address: {
+            street_name: String(delivery.line1 || "").slice(0, 80),
+            zip_code: String(delivery.postalCode || "").slice(0, 12),
+            city_name: String(delivery.city || "").slice(0, 80),
+            state_name: String(delivery.region || "").slice(0, 80),
+            country_name: "Chile",
+          },
+        },
+      } : {}),
+      external_reference: data.orderId,
+      statement_descriptor: "ELPUNTOFERTAS",
+      ...preferenceRedirect(origin),
+      ...(withInstallments && installmentCount > 1 ? { payment_methods: { installments: installmentCount } } : {}),
+      ...(origin.startsWith("https://") ? { notification_url: `${origin}/api/mercadopago/webhook` } : {}),
+    });
+    const requestPreference = (withInstallments: boolean) => fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        items,
-        payer: {
-          name: String(delivery?.firstName || order.customerName || "").slice(0, 80),
-          surname: String(delivery?.lastName || "").slice(0, 80),
-          email: String(order.customerEmail ?? ""),
-          phone: { number: String(order.customerPhone ?? "").replace(/\D/g, "").slice(0, 15) },
-          ...(delivery ? {
-            address: {
-              street_name: String(delivery.line1 || "").slice(0, 80),
-              zip_code: String(delivery.postalCode || "").slice(0, 12),
-            },
-          } : {}),
-        },
-        ...(delivery ? {
-          shipments: {
-            receiver_address: {
-              street_name: String(delivery.line1 || "").slice(0, 80),
-              zip_code: String(delivery.postalCode || "").slice(0, 12),
-              city_name: String(delivery.city || "").slice(0, 80),
-              state_name: String(delivery.region || "").slice(0, 80),
-              country_name: "Chile",
-            },
-          },
-        } : {}),
-        external_reference: data.orderId,
-        statement_descriptor: "ELPUNTOFERTAS",
-        back_urls: {
-          success: `${origin}/carrito?pago=retorno`,
-          pending: `${origin}/carrito?pago=retorno`,
-          failure: `${origin}/carrito?pago=retorno`,
-        },
-        auto_return: "approved",
-      }),
+      body: JSON.stringify(preferenceBody(withInstallments)),
     });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      if (response.status === 403) {
-        return {
-          ok: false as const,
-          message: "Mercado Pago bloqueó este Access Token de prueba. En el panel abre Credenciales de producción, actívalas y usa el token que empieza con APP_USR-.",
-        };
-      }
-      return { ok: false as const, message: "Mercado Pago no aceptó el cobro. Revisa el Access Token de la cuenta." };
+    let response = await requestPreference(true);
+    let payload = await response.json().catch(() => ({}));
+    const firstCause = JSON.stringify(payload?.cause ?? payload?.message ?? "");
+    if (!response.ok && installmentCount > 1 && /installment/i.test(firstCause)) {
+      response = await requestPreference(false);
+      payload = await response.json().catch(() => ({}));
     }
-    const checkoutUrl = token.startsWith("TEST-") ? payload.sandbox_init_point : payload.init_point;
-    if (typeof checkoutUrl !== "string" || !checkoutUrl.startsWith("https://")) {
+    if (!response.ok) {
+      const cause = Array.isArray(payload?.cause)
+        ? payload.cause.map((item: { code?: unknown; description?: unknown }) => String(item?.description || item?.code || "")).filter(Boolean).slice(0, 3).join(" | ")
+        : "";
+      console.error("[mercadopago] preferencia rechazada", response.status, String(payload?.error || payload?.message || "").slice(0, 160), cause.slice(0, 240));
+      return { ok: false as const, message: "Mercado Pago no pudo abrir el pago. Inténtalo de nuevo o coordina por WhatsApp." };
+    }
+    const checkoutUrl = checkoutUrlFor(token, payload);
+    if (!checkoutUrl) {
       return { ok: false as const, message: "Mercado Pago no entregó el enlace de pago." };
     }
     await ref.set(
@@ -134,12 +130,63 @@ export const createMercadoPagoCheckout = createServerFn({ method: "POST" })
         paymentMethod: "mercadopago",
         paymentStatus: "unpaid",
         mercadoPagoPreferenceId: payload.id ?? null,
+        mercadoPagoCheckoutUrl: checkoutUrl,
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
     );
     return { ok: true as const, checkoutUrl };
   });
+
+function orderReceipt(orderId: string, order: Record<string, unknown>) {
+  const rawItems = Array.isArray(order.items) ? order.items : [];
+  const address = order.shippingAddress && typeof order.shippingAddress === "object"
+    ? order.shippingAddress as Record<string, unknown>
+    : null;
+  const addressText = address
+    ? [address.line1, address.line2, address.city, address.region].map((value) => String(value ?? "").trim()).filter(Boolean).join(", ")
+    : "";
+  return {
+    orderId,
+    customerName: String(order.customerName ?? ""),
+    fulfillment: order.fulfillment === "retiro" ? "retiro" as const : "despacho" as const,
+    address: addressText || null,
+    items: rawItems.map((item) => {
+      const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
+      return {
+        name: String(row.name ?? "Producto"),
+        quantity: Math.max(0, Math.floor(Number(row.quantity ?? 0))),
+        lineTotal: Math.round(Number(row.lineTotal ?? 0)),
+      };
+    }),
+    subtotal: Math.round(Number(order.subtotal ?? 0)),
+    shippingCost: order.shippingCost == null ? null : Math.round(Number(order.shippingCost)),
+    shippingNote: String(order.shippingNote ?? ""),
+    total: Math.round(Number(order.total ?? 0)),
+    status: String(order.status ?? "pending"),
+    paymentStatus: String(order.paymentStatus ?? "unpaid"),
+    mercadoPagoStatus: order.mercadoPagoStatus == null ? null : String(order.mercadoPagoStatus),
+  };
+}
+
+async function readReceipt(orderId: string) {
+  const { getFirebaseAdminDb } = await import("@/integrations/firebase/admin.server");
+  const snap = await getFirebaseAdminDb().collection("orders").doc(orderId).get();
+  if (!snap.exists) return null;
+  return orderReceipt(orderId, snap.data() ?? {});
+}
+
+async function paymentForOrder(token: string, orderId: string) {
+  const url = new URL("https://api.mercadopago.com/v1/payments/search");
+  url.searchParams.set("external_reference", orderId);
+  url.searchParams.set("sort", "date_created");
+  url.searchParams.set("criteria", "desc");
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) return null;
+  const payload = await response.json().catch(() => ({}));
+  const results = Array.isArray(payload.results) ? payload.results : [];
+  return results.find((item: { status?: string }) => item?.status === "approved") ?? results[0] ?? null;
+}
 
 export const confirmMercadoPagoReturn = createServerFn({ method: "POST" })
   .inputValidator((data: { orderId: string; paymentId: string }) => {
@@ -151,31 +198,35 @@ export const confirmMercadoPagoReturn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const token = accessToken();
     if (!token) return { ok: false as const, status: "unknown" as const, message: "Mercado Pago no está conectado." };
-    const response = await fetch(`https://api.mercadopago.com/v1/payments/${data.paymentId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const payment = await response.json().catch(() => ({}));
-    if (!response.ok) return { ok: false as const, status: "unknown" as const, message: "No pudimos confirmar el pago con Mercado Pago." };
-    if (String(payment.external_reference ?? "") !== data.orderId) {
-      return { ok: false as const, status: "unknown" as const, message: "El pago no corresponde a este pedido." };
-    }
-    const status = String(payment.status ?? "");
-    if (status === "approved") {
-      const { getFirebaseAdminDb } = await import("@/integrations/firebase/admin.server");
-      const { FieldValue } = await import("firebase-admin/firestore");
-      await getFirebaseAdminDb().collection("orders").doc(data.orderId).set(
-        {
-          paymentStatus: "paid",
-          paymentMethod: "mercadopago",
-          mercadoPagoPaymentId: data.paymentId,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true },
-      );
-      return { ok: true as const, status: "approved" as const, message: "Mercado Pago confirmó el pago." };
-    }
-    if (status === "pending" || status === "in_process") {
-      return { ok: true as const, status: "pending" as const, message: "El pago quedó pendiente en Mercado Pago." };
-    }
-    return { ok: true as const, status: "rejected" as const, message: "Mercado Pago no aprobó el pago. El pedido sigue sin cobrar." };
+    const payment = await fetchMercadoPagoPayment(token, data.paymentId);
+    if (!payment) return { ok: false as const, status: "unknown" as const, message: "No pudimos confirmar el pago con Mercado Pago." };
+    const result = await applyMercadoPagoPayment(data.orderId, payment);
+    if (!result.ok) return { ok: false as const, status: "unknown" as const, message: result.message, receipt: null };
+    const status = result.status === "approved"
+      ? "approved" as const
+      : result.status === "pending" || result.status === "in_process" || result.status === "authorized" || result.status === "in_mediation"
+        ? "pending" as const
+        : "rejected" as const;
+    return { ok: true as const, status, message: result.message, receipt: await readReceipt(data.orderId) };
+  });
+
+export const syncMercadoPagoOrder = createServerFn({ method: "POST" })
+  .inputValidator((data: { orderId: string }) => {
+    const orderId = data?.orderId?.trim() ?? "";
+    if (!orderId || orderId.length > 80) throw new Error("Pedido inválido");
+    return { orderId };
+  })
+  .handler(async ({ data }) => {
+    const token = accessToken();
+    if (!token) return { ok: false as const, status: "unknown" as const, message: "Mercado Pago no está conectado.", receipt: null };
+    const payment = await paymentForOrder(token, data.orderId);
+    if (!payment) return { ok: false as const, status: "unknown" as const, message: "Todavía no hay un pago de Mercado Pago para este pedido.", receipt: await readReceipt(data.orderId) };
+    const result = await applyMercadoPagoPayment(data.orderId, payment);
+    if (!result.ok) return { ok: false as const, status: "unknown" as const, message: result.message, receipt: await readReceipt(data.orderId) };
+    const status = result.status === "approved"
+      ? "approved" as const
+      : result.status === "pending" || result.status === "in_process" || result.status === "authorized" || result.status === "in_mediation"
+        ? "pending" as const
+        : "rejected" as const;
+    return { ok: true as const, status, message: result.message, receipt: await readReceipt(data.orderId) };
   });

@@ -26,6 +26,14 @@ const LABEL: Record<string, string> = {
   cancelled: "Cancelado",
 };
 
+const PAYMENT: Record<string, string> = {
+  paid: "Pagado",
+  unpaid: "Sin pago",
+  pending: "Pago pendiente",
+  rejected: "Pago rechazado",
+  cancelled: "Pago anulado",
+};
+
 function OrdersAdmin() {
   const changeStatus = useServerFn(updateOrderStatus);
   const [rows, setRows] = useState<Array<Record<string, any> & { id: string }>>([]);
@@ -64,7 +72,7 @@ function OrdersAdmin() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-extrabold tracking-tighter">Pedidos</h1>
-        <p className="mt-1 text-sm text-muted-foreground">El stock no se descuenta al crear un pedido pendiente. El cambio de estado queda auditado en el servidor.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Los pagos aprobados por Mercado Pago llegan aquí como pedidos confirmados y descuentan el stock una sola vez.</p>
       </div>
       {loading ? <p className="text-sm text-muted-foreground">Cargando…</p> : error ? (
         <div className="rounded-xl border border-destructive/30 p-6">
@@ -98,6 +106,7 @@ function OrdersAdmin() {
                 ))}
               </ul>
               <p className="mt-2 text-xs text-muted-foreground">{order.shippingNote}</p>
+              <p className="text-xs text-muted-foreground">Pago: {PAYMENT[order.paymentStatus] ?? order.paymentStatus ?? "Sin pago"}{order.mercadoPagoStatus ? ` · Mercado Pago ${order.mercadoPagoStatus}` : ""}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {(NEXT[order.status] ?? []).map((status) => (
                   <button key={status} type="button" disabled={busy === order.id} onClick={() => update(order.id, status)} className="rounded-full border border-border px-3 py-1 text-xs font-semibold disabled:opacity-50">

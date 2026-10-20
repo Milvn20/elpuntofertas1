@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SiteFooter, SiteHeader } from "@/components/site/header";
-import { SITE, whatsappGeneral } from "@/lib/site";
+import { formatCLP, SITE, whatsappGeneral } from "@/lib/site";
+import { useCommerceSettings } from "@/lib/commerce/context";
 
 export const Route = createFileRoute("/contacto")({
   head: () => ({
@@ -13,12 +14,13 @@ export const Route = createFileRoute("/contacto")({
 });
 
 function ContactPage() {
+  const commerce = useCommerceSettings();
   return (
     <div className="min-h-screen">
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-4 py-12 md:px-6">
         <h1 className="text-4xl font-extrabold tracking-tighter">Contacto</h1>
-        <p className="mt-3 text-muted-foreground">Las compras y consultas se coordinan directamente. No hay pasarela de pago activa en el sitio.</p>
+        <p className="mt-3 text-muted-foreground">Puedes pagar con Mercado Pago desde el carrito o escribirnos por WhatsApp para coordinar la compra.</p>
         <dl className="mt-8 space-y-4 rounded-2xl border border-border bg-card p-6">
           <div>
             <dt className="text-xs uppercase tracking-widest text-muted-foreground">Ciudad</dt>
@@ -38,7 +40,7 @@ function ContactPage() {
           </div>
           <div>
             <dt className="text-xs uppercase tracking-widest text-muted-foreground">Despacho</dt>
-            <dd>{SITE.shippingBanner.replace("🚚 ", "")}</dd>
+            <dd>Despacho gratis en compras sobre {formatCLP(commerce.freeShippingMinClp)}. Bajo ese monto el despacho cuesta {formatCLP(commerce.baseShippingClp)}.</dd>
           </div>
         </dl>
       </main>

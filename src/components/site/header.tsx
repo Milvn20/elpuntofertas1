@@ -2,7 +2,8 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Search, ShieldUser, LogOut, Menu, X, ShoppingBag } from "lucide-react";
 import { FaInstagram } from "react-icons/fa";
-import { SITE, whatsappGeneral } from "@/lib/site";
+import { formatCLP, SITE, whatsappGeneral } from "@/lib/site";
+import { useCommerceSettings } from "@/lib/commerce/context";
 import logo from "@/assets/elpuntofertas-logo.png";
 import { getCurrentSession, signOut } from "@/lib/auth/client";
 import { useFirebaseBackend } from "@/lib/data/backend";
@@ -22,6 +23,7 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const cart = useCart();
+  const commerce = useCommerceSettings();
 
   useEffect(() => {
     let unsub = () => {};
@@ -66,7 +68,7 @@ export function SiteHeader() {
     <div className="sticky top-0 z-50">
       <div className="bg-foreground text-background">
         <p className="px-4 py-1.5 text-center font-mono text-[10px] uppercase tracking-[0.18em]">
-          {SITE.shippingBanner.replace("🚚 ", "")}
+          Despacho gratis en compras sobre {formatCLP(commerce.freeShippingMinClp)}
         </p>
       </div>
       <header className="border-b border-border bg-background/90 backdrop-blur-md">

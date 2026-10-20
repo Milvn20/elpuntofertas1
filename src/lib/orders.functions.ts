@@ -2,8 +2,19 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { useFirebaseBackend } from "@/lib/data/backend";
 import { assertAdminContext, requireAuth } from "@/lib/require-auth.middleware";
-import { formatShippingAddress, parseShippingAddress, type ShippingAddress } from "@/lib/orders/address";
-import { isUuid, orderSummaryText, quoteOrder, type Fulfillment, type PricedProduct, type QuoteLineRequest } from "@/lib/orders/pricing";
+import {
+  formatShippingAddress,
+  parseShippingAddress,
+  type ShippingAddress,
+} from "@/lib/orders/address";
+import {
+  isUuid,
+  orderSummaryText,
+  quoteOrder,
+  type Fulfillment,
+  type PricedProduct,
+  type QuoteLineRequest,
+} from "@/lib/orders/pricing";
 
 const attempts = new Map<string, { count: number; at: number }>();
 
@@ -15,7 +26,8 @@ function rateLimit(key: string) {
     return;
   }
   row.count += 1;
-  if (row.count > 12) throw new Error("Demasiados intentos. Espera unos minutos e inténtalo de nuevo.");
+  if (row.count > 12)
+    throw new Error("Demasiados intentos. Espera unos minutos e inténtalo de nuevo.");
 }
 
 const ORDER_STATUSES = ["pending", "confirmed", "ready", "delivered", "cancelled"] as const;
@@ -47,13 +59,17 @@ function parseCreateOrder(data: CreateOrderInput): CreateOrderInput {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("El correo no es válido.");
   const digits = phone.replace(/\D/g, "");
   if (digits.length < 8 || digits.length > 15) throw new Error("El teléfono no es válido.");
-  if (data.fulfillment !== "retiro" && data.fulfillment !== "despacho") throw new Error("Elige retiro o despacho.");
-  const shippingAddress = data.fulfillment === "despacho" ? parseShippingAddress(data.shippingAddress) : null;
+  if (data.fulfillment !== "retiro" && data.fulfillment !== "despacho")
+    throw new Error("Elige retiro o despacho.");
+  const shippingAddress =
+    data.fulfillment === "despacho" ? parseShippingAddress(data.shippingAddress) : null;
   const name = shippingAddress
     ? `${shippingAddress.firstName} ${shippingAddress.lastName}`
     : (data?.customerName?.trim() ?? "");
-  if (name.length < 2 || name.length > 120) throw new Error("Escribe un nombre de contacto válido.");
-  if (!Array.isArray(data.items) || data.items.length === 0) throw new Error("El carrito está vacío.");
+  if (name.length < 2 || name.length > 120)
+    throw new Error("Escribe un nombre de contacto válido.");
+  if (!Array.isArray(data.items) || data.items.length === 0)
+    throw new Error("El carrito está vacío.");
   return {
     clientRequestId,
     customerName: name,
@@ -87,7 +103,9 @@ export const createOrder = createServerFn({ method: "POST" })
     const request = getRequest();
     rateLimit(request?.headers?.get("x-forwarded-for") ?? data.customerEmail);
     if (!useFirebaseBackend()) {
-      throw new Error("Los pedidos se registran solo en Firebase. Configura el proyecto antes de confirmar una compra.");
+      throw new Error(
+        "Los pedidos se registran solo en Firebase. Configura el proyecto antes de confirmar una compra.",
+      );
     }
     let db;
     try {
@@ -95,8 +113,14 @@ export const createOrder = createServerFn({ method: "POST" })
       db = getFirebaseAdminDb();
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
-      if (/default credentials|Could not load|credential/i.test(message)) {
-        throw new Error("No se pudo guardar el pedido: el servidor no tiene credenciales de Firebase. El carrito sigue intacto.");
+      if (
+        /Could not load the default credentials|Could not refresh|default credentials/i.test(
+          message,
+        )
+      ) {
+        throw new Error(
+          "No se pudo guardar el pedido: el servidor no tiene credenciales de Firebase. El carrito sigue intacto.",
+        );
       }
       throw err;
     }
@@ -107,13 +131,21 @@ export const createOrder = createServerFn({ method: "POST" })
       existing = await ref.get();
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
-      if (/default credentials|Could not load|Could not refresh/i.test(message)) {
-        throw new Error("No se pudo guardar el pedido: el servidor no tiene credenciales de Firebase. El carrito sigue intacto.");
+      if (
+        /Could not load the default credentials|Could not refresh|default credentials/i.test(
+          message,
+        )
+      ) {
+        throw new Error(
+          "No se pudo guardar el pedido: el servidor no tiene credenciales de Firebase. El carrito sigue intacto.",
+        );
       }
       throw err;
     }
-    if (existing.exists) {
-      const saved = existing.data() ?? {};
+    const saved = existing.exists ? (existing.data() ?? {}) : null;
+    const savedCheckout =
+      typeof saved?.mercadoPagoCheckoutUrl === "string" ? saved.mercadoPagoCheckoutUrl : "";
+    if (saved && (saved.paymentStatus === "paid" || savedCheckout.startsWith("https://"))) {
       return {
         ok: true as const,
         alreadyExisted: true,
@@ -143,13 +175,14 @@ export const createOrder = createServerFn({ method: "POST" })
       });
     });
 
-    const quoted = quoteOrder(data.items, products, data.fulfillment);
+    const { loadCommerceSettings } = await import("@/lib/commerce/settings.server");
+    const commerce = await loadCommerceSettings();
+    const quoted = quoteOrder(data.items, products, data.fulfillment, commerce);
     if (!quoted.ok) return quoted;
 
     const userId = await optionalUserId();
     const quote = quoted.quote;
-    await ref.create({
-      userId,
+    const priced = {
       customerName: data.customerName,
       customerEmail: data.customerEmail,
       customerPhone: data.customerPhone,
@@ -160,25 +193,63 @@ export const createOrder = createServerFn({ method: "POST" })
       shippingCost: quote.shippingCost,
       shippingNote: quote.shippingNote,
       total: quote.total,
-      status: "pending",
-      paymentMethod: "coordinar",
-      paymentStatus: "unpaid",
-      inventoryPolicy: "checked_not_decremented",
-      createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
-    });
-    await db.collection("auditLogs").doc(crypto.randomUUID()).set({
-      actorUid: userId,
-      action: "order_create",
-      entityType: "order",
-      entityId: ref.id,
-      timestamp: FieldValue.serverTimestamp(),
-      metadata: { itemCount: quote.items.length, total: quote.total, status: "pending" },
-    });
+    };
+    if (saved) {
+      await ref.set(priced, { merge: true });
+    } else {
+      await ref.create({
+        ...priced,
+        userId,
+        status: "pending",
+        paymentMethod: "coordinar",
+        paymentStatus: "unpaid",
+        inventoryPolicy: "checked_not_decremented",
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    }
+    await db
+      .collection("auditLogs")
+      .doc(crypto.randomUUID())
+      .set({
+        actorUid: userId,
+        action: saved ? "order_reprice" : "order_create",
+        entityType: "order",
+        entityId: ref.id,
+        timestamp: FieldValue.serverTimestamp(),
+        metadata: { itemCount: quote.items.length, total: quote.total, status: "pending" },
+      });
+
+    const mail = saved
+      ? { buyer: "skipped" as const, store: "skipped" as const }
+      : await import("@/lib/orders/mail.server")
+          .then(({ deliverOrderMail }) =>
+            deliverOrderMail(
+              {
+                orderId: ref.id,
+                customerName: data.customerName,
+                customerEmail: data.customerEmail,
+                customerPhone: data.customerPhone,
+                fulfillment: quote.fulfillment,
+                address: data.shippingAddress ? formatShippingAddress(data.shippingAddress) : null,
+                items: quote.items.map((item) => ({
+                  name: item.name,
+                  quantity: item.quantity,
+                  lineTotal: item.lineTotal,
+                })),
+                subtotal: quote.subtotal,
+                shippingCost: quote.shippingCost,
+                total: quote.total,
+              },
+              "placed",
+            ),
+          )
+          .catch(() => ({ buyer: "failed" as const, store: "failed" as const }));
 
     return {
       ok: true as const,
-      alreadyExisted: false,
+      alreadyExisted: Boolean(saved),
+      mail,
       orderId: ref.id,
       subtotal: quote.subtotal,
       shippingCost: quote.shippingCost,
@@ -203,7 +274,8 @@ export const createOrder = createServerFn({ method: "POST" })
 export const updateOrderStatus = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((data: { orderId: string; status: OrderStatus }) => {
-    if (!data?.orderId || !ORDER_STATUSES.includes(data.status)) throw new Error("Estado de pedido inválido");
+    if (!data?.orderId || !ORDER_STATUSES.includes(data.status))
+      throw new Error("Estado de pedido inválido");
     return { orderId: data.orderId, status: data.status };
   })
   .handler(async ({ data, context }) => {
@@ -220,13 +292,16 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
       throw new Error("Ese cambio de estado no está permitido.");
     }
     await ref.update({ status: data.status, updatedAt: FieldValue.serverTimestamp() });
-    await db.collection("auditLogs").doc(crypto.randomUUID()).set({
-      actorUid: context.userId,
-      action: "order_status",
-      entityType: "order",
-      entityId: data.orderId,
-      timestamp: FieldValue.serverTimestamp(),
-      metadata: { from: current, to: data.status },
-    });
+    await db
+      .collection("auditLogs")
+      .doc(crypto.randomUUID())
+      .set({
+        actorUid: context.userId,
+        action: "order_status",
+        entityType: "order",
+        entityId: data.orderId,
+        timestamp: FieldValue.serverTimestamp(),
+        metadata: { from: current, to: data.status },
+      });
     return { ok: true as const };
   });

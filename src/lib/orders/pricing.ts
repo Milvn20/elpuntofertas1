@@ -1,4 +1,4 @@
-export const FREE_SHIPPING_MIN_CLP = 20_000;
+import { DEFAULT_COMMERCE_SETTINGS, shippingQuote, type CommerceSettings } from "../commerce/policy";
 
 export type Fulfillment = "retiro" | "despacho";
 
@@ -54,20 +54,13 @@ export function clp(value: number): number {
   return Math.round(value);
 }
 
-export function shippingFor(subtotal: number, fulfillment: Fulfillment): { cost: number | null; note: string } {
-  if (fulfillment === "retiro") {
-    return { cost: 0, note: "Retiro coordinado. Este pedido no incluye costo de despacho." };
-  }
-  if (subtotal >= FREE_SHIPPING_MIN_CLP) {
-    return {
-      cost: 0,
-      note: "Despacho sin costo: la compra alcanza los $20.000 indicados por la tienda.",
-    };
-  }
-  return {
-    cost: null,
-    note: "El despacho bajo $20.000 se confirma por WhatsApp y no está incluido en el total.",
-  };
+export function shippingFor(
+  subtotal: number,
+  fulfillment: Fulfillment,
+  settings: CommerceSettings = DEFAULT_COMMERCE_SETTINGS,
+): { cost: number | null; note: string } {
+  const quote = shippingQuote(subtotal, fulfillment, settings);
+  return { cost: quote.cost, note: quote.note };
 }
 
 export function discountPercent(price: number, previousPrice?: number | null): number | null {
@@ -99,6 +92,7 @@ export function quoteOrder(
   requested: QuoteLineRequest[],
   products: Map<string, PricedProduct>,
   fulfillment: Fulfillment,
+  settings: CommerceSettings = DEFAULT_COMMERCE_SETTINGS,
 ): QuoteSuccess | QuoteFailure {
   if (fulfillment !== "retiro" && fulfillment !== "despacho") {
     return { ok: false, code: "invalid", message: "Elige retiro o despacho." };
@@ -147,7 +141,7 @@ export function quoteOrder(
   }
 
   const subtotal = freshItems.reduce((sum, line) => sum + line.lineTotal, 0);
-  const shipping = shippingFor(subtotal, fulfillment);
+  const shipping = shippingFor(subtotal, fulfillment, settings);
   const quote: OrderQuote = {
     items: freshItems,
     subtotal,

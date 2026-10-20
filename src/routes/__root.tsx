@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { WhatsappFloat } from "@/components/site/WhatsappFloat";
 import { CartProvider } from "@/lib/cart/cart-context";
+import { CommerceProvider } from "@/lib/commerce/context";
 
 function NotFoundComponent() {
   return (
@@ -127,11 +128,13 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <CartProvider>
-        <Outlet />
-        <WhatsappFloat />
-        <Toaster richColors position="top-right" />
-      </CartProvider>
+      <CommerceProvider>
+        <CartProvider>
+          <Outlet />
+          <WhatsappFloat />
+          <Toaster richColors position="top-right" />
+        </CartProvider>
+      </CommerceProvider>
     </QueryClientProvider>
   );
 }

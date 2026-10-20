@@ -18,8 +18,10 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProductoSlugRouteImport } from './routes/producto.$slug'
+import { Route as PagoResultadoRouteImport } from './routes/pago.resultado'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authenticated/admin.usuarios'
+import { Route as AuthenticatedAdminPreciosRouteImport } from './routes/_authenticated/admin.precios'
 import { Route as AuthenticatedAdminPedidosRouteImport } from './routes/_authenticated/admin.pedidos'
 import { Route as AuthenticatedAdminCategoriasRouteImport } from './routes/_authenticated/admin.categorias'
 import { Route as AuthenticatedAdminActividadRouteImport } from './routes/_authenticated/admin.actividad'
@@ -71,6 +73,11 @@ const ProductoSlugRoute = ProductoSlugRouteImport.update({
   path: '/producto/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PagoResultadoRoute = PagoResultadoRouteImport.update({
+  id: '/pago/resultado',
+  path: '/pago/resultado',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
@@ -80,6 +87,12 @@ const AuthenticatedAdminUsuariosRoute =
   AuthenticatedAdminUsuariosRouteImport.update({
     id: '/admin/usuarios',
     path: '/admin/usuarios',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminPreciosRoute =
+  AuthenticatedAdminPreciosRouteImport.update({
+    id: '/admin/precios',
+    path: '/admin/precios',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedAdminPedidosRoute =
@@ -127,10 +140,12 @@ export interface FileRoutesByFullPath {
   '/contacto': typeof ContactoRoute
   '/cuenta': typeof CuentaRoute
   '/ofertas': typeof OfertasRoute
+  '/pago/resultado': typeof PagoResultadoRoute
   '/producto/$slug': typeof ProductoSlugRoute
   '/admin/actividad': typeof AuthenticatedAdminActividadRoute
   '/admin/categorias': typeof AuthenticatedAdminCategoriasRoute
   '/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
+  '/admin/precios': typeof AuthenticatedAdminPreciosRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/admin/productos/$id': typeof AuthenticatedAdminProductosIdRoute
@@ -145,10 +160,12 @@ export interface FileRoutesByTo {
   '/contacto': typeof ContactoRoute
   '/cuenta': typeof CuentaRoute
   '/ofertas': typeof OfertasRoute
+  '/pago/resultado': typeof PagoResultadoRoute
   '/producto/$slug': typeof ProductoSlugRoute
   '/admin/actividad': typeof AuthenticatedAdminActividadRoute
   '/admin/categorias': typeof AuthenticatedAdminCategoriasRoute
   '/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
+  '/admin/precios': typeof AuthenticatedAdminPreciosRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/admin/productos/$id': typeof AuthenticatedAdminProductosIdRoute
@@ -165,10 +182,12 @@ export interface FileRoutesById {
   '/contacto': typeof ContactoRoute
   '/cuenta': typeof CuentaRoute
   '/ofertas': typeof OfertasRoute
+  '/pago/resultado': typeof PagoResultadoRoute
   '/producto/$slug': typeof ProductoSlugRoute
   '/_authenticated/admin/actividad': typeof AuthenticatedAdminActividadRoute
   '/_authenticated/admin/categorias': typeof AuthenticatedAdminCategoriasRoute
   '/_authenticated/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
+  '/_authenticated/admin/precios': typeof AuthenticatedAdminPreciosRoute
   '/_authenticated/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/admin/productos/$id': typeof AuthenticatedAdminProductosIdRoute
@@ -185,10 +204,12 @@ export interface FileRouteTypes {
     | '/contacto'
     | '/cuenta'
     | '/ofertas'
+    | '/pago/resultado'
     | '/producto/$slug'
     | '/admin/actividad'
     | '/admin/categorias'
     | '/admin/pedidos'
+    | '/admin/precios'
     | '/admin/usuarios'
     | '/admin/'
     | '/admin/productos/$id'
@@ -203,10 +224,12 @@ export interface FileRouteTypes {
     | '/contacto'
     | '/cuenta'
     | '/ofertas'
+    | '/pago/resultado'
     | '/producto/$slug'
     | '/admin/actividad'
     | '/admin/categorias'
     | '/admin/pedidos'
+    | '/admin/precios'
     | '/admin/usuarios'
     | '/admin'
     | '/admin/productos/$id'
@@ -222,10 +245,12 @@ export interface FileRouteTypes {
     | '/contacto'
     | '/cuenta'
     | '/ofertas'
+    | '/pago/resultado'
     | '/producto/$slug'
     | '/_authenticated/admin/actividad'
     | '/_authenticated/admin/categorias'
     | '/_authenticated/admin/pedidos'
+    | '/_authenticated/admin/precios'
     | '/_authenticated/admin/usuarios'
     | '/_authenticated/admin/'
     | '/_authenticated/admin/productos/$id'
@@ -242,6 +267,7 @@ export interface RootRouteChildren {
   ContactoRoute: typeof ContactoRoute
   CuentaRoute: typeof CuentaRoute
   OfertasRoute: typeof OfertasRoute
+  PagoResultadoRoute: typeof PagoResultadoRoute
   ProductoSlugRoute: typeof ProductoSlugRoute
 }
 
@@ -310,6 +336,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductoSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pago/resultado': {
+      id: '/pago/resultado'
+      path: '/pago/resultado'
+      fullPath: '/pago/resultado'
+      preLoaderRoute: typeof PagoResultadoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
       path: '/admin'
@@ -322,6 +355,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/usuarios'
       fullPath: '/admin/usuarios'
       preLoaderRoute: typeof AuthenticatedAdminUsuariosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/precios': {
+      id: '/_authenticated/admin/precios'
+      path: '/admin/precios'
+      fullPath: '/admin/precios'
+      preLoaderRoute: typeof AuthenticatedAdminPreciosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/admin/pedidos': {
@@ -373,6 +413,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminActividadRoute: typeof AuthenticatedAdminActividadRoute
   AuthenticatedAdminCategoriasRoute: typeof AuthenticatedAdminCategoriasRoute
   AuthenticatedAdminPedidosRoute: typeof AuthenticatedAdminPedidosRoute
+  AuthenticatedAdminPreciosRoute: typeof AuthenticatedAdminPreciosRoute
   AuthenticatedAdminUsuariosRoute: typeof AuthenticatedAdminUsuariosRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
   AuthenticatedAdminProductosIdRoute: typeof AuthenticatedAdminProductosIdRoute
@@ -384,6 +425,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminActividadRoute: AuthenticatedAdminActividadRoute,
   AuthenticatedAdminCategoriasRoute: AuthenticatedAdminCategoriasRoute,
   AuthenticatedAdminPedidosRoute: AuthenticatedAdminPedidosRoute,
+  AuthenticatedAdminPreciosRoute: AuthenticatedAdminPreciosRoute,
   AuthenticatedAdminUsuariosRoute: AuthenticatedAdminUsuariosRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   AuthenticatedAdminProductosIdRoute: AuthenticatedAdminProductosIdRoute,
@@ -404,6 +446,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactoRoute: ContactoRoute,
   CuentaRoute: CuentaRoute,
   OfertasRoute: OfertasRoute,
+  PagoResultadoRoute: PagoResultadoRoute,
   ProductoSlugRoute: ProductoSlugRoute,
 }
 export const routeTree = rootRouteImport

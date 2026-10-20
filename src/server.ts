@@ -53,6 +53,11 @@ function withSecurityHeaders(response: Response) {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const url = new URL(request.url);
+      if (url.pathname === "/api/mercadopago/webhook") {
+        const { handleMercadoPagoWebhook } = await import("./lib/payments/webhook.server");
+        return withSecurityHeaders(await handleMercadoPagoWebhook(request));
+      }
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response));

@@ -9,6 +9,8 @@ import { fetchProductBySlug, fetchRelatedProducts } from "@/lib/data/catalog";
 import type { ProductRecord } from "@/lib/db/types";
 import { discountPercent } from "@/lib/orders/pricing";
 import { useCart } from "@/lib/cart/cart-context";
+import { useCommerceSettings } from "@/lib/commerce/context";
+import { displayInstallmentAmount, shippingProgressMessage } from "@/lib/commerce/policy";
 
 export const Route = createFileRoute("/producto/$slug")({
   head: ({ params }) => ({
@@ -23,6 +25,7 @@ export const Route = createFileRoute("/producto/$slug")({
 function ProductDetail() {
   const { slug } = Route.useParams();
   const cart = useCart();
+  const commerce = useCommerceSettings();
   const [p, setP] = useState<ProductRecord | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState(0);
@@ -91,6 +94,7 @@ function ProductDetail() {
   const av = availability(p.stock, p.minStock);
   const discount = discountPercent(p.price, p.previousPrice);
   const maxQty = Math.max(p.stock, 0);
+  const installmentAmount = commerce.showInstallments ? displayInstallmentAmount(p.price, commerce.installmentCount) : null;
 
   function addToCart() {
     const result = cart.addItem({
@@ -162,6 +166,14 @@ function ProductDetail() {
             <span className={`rounded-full px-3 py-1 text-[10px] uppercase tracking-widest ${av.tone === "ok" ? "bg-whatsapp/15 text-whatsapp" : av.tone === "low" ? "bg-accent/15 text-accent" : "bg-destructive/15 text-destructive"}`}>
               {av.label}
             </span>
+          </div>
+          <div className="mb-6 space-y-1 text-sm text-muted-foreground">
+            {installmentAmount != null && (
+              <p>
+                Simulación: {commerce.installmentCount} cuotas de {formatCLP(installmentAmount)}. El interés lo confirma Mercado Pago al pagar; esta tienda no agrega un recargo.
+              </p>
+            )}
+            <p>{shippingProgressMessage(p.price, commerce)}</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="inline-flex items-center rounded-full border border-border">

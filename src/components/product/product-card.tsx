@@ -1,4 +1,6 @@
 import { Link } from "@tanstack/react-router";
+import { useCommerceSettings } from "@/lib/commerce/context";
+import { displayInstallmentAmount } from "@/lib/commerce/policy";
 import { availability, conditionLabel, formatCLP } from "@/lib/site";
 
 export type ProductCardData = {
@@ -19,7 +21,14 @@ export type ProductCardData = {
 
 export function ProductCard({ p }: { p: ProductCardData }) {
   const av = availability(p.stock, p.min_stock);
-  const previous = p.previousPrice != null && Number(p.previousPrice) > Number(p.price) ? Number(p.previousPrice) : null;
+  const commerce = useCommerceSettings();
+  const previous =
+    p.previousPrice != null && Number(p.previousPrice) > Number(p.price)
+      ? Number(p.previousPrice)
+      : null;
+  const installmentAmount = commerce.showInstallments
+    ? displayInstallmentAmount(Number(p.price), commerce.installmentCount)
+    : null;
   return (
     <Link
       to="/producto/$slug"
@@ -36,7 +45,9 @@ export function ProductCard({ p }: { p: ProductCardData }) {
           />
         ) : (
           <div className="flex size-full items-center justify-center">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Sin imagen</span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              Sin imagen
+            </span>
           </div>
         )}
         <div className="absolute left-2.5 top-2.5 flex gap-1">
@@ -50,7 +61,9 @@ export function ProductCard({ p }: { p: ProductCardData }) {
           <div className="absolute right-2.5 top-2.5">
             <span
               className={`rounded-full px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest ${
-                av.tone === "out" ? "bg-destructive text-destructive-foreground" : "bg-accent text-accent-foreground"
+                av.tone === "out"
+                  ? "bg-destructive text-destructive-foreground"
+                  : "bg-accent text-accent-foreground"
               }`}
             >
               {av.label}
@@ -65,7 +78,15 @@ export function ProductCard({ p }: { p: ProductCardData }) {
         </div>
         <div className="flex flex-wrap items-baseline gap-2">
           <p className="text-base font-bold">{formatCLP(p.price)}</p>
-          {previous != null && <p className="text-xs text-muted-foreground line-through">{formatCLP(previous)}</p>}
+          {previous != null && (
+            <p className="text-xs text-muted-foreground line-through">{formatCLP(previous)}</p>
+          )}
+          {installmentAmount != null && (
+            <p className="w-full text-[11px] text-muted-foreground">
+              {commerce.installmentCount} cuotas de {formatCLP(installmentAmount)} · se confirma al
+              pagar
+            </p>
+          )}
         </div>
       </div>
     </Link>
