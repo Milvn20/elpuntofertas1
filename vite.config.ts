@@ -13,5 +13,16 @@ export default defineConfig({
     server: { entry: "server" },
   },
   // Fuera de Lovable el despliegue es Netlify. Dentro del sandbox de Lovable el preset vuelve a Cloudflare.
-  nitro: { preset: "netlify" },
+  nitro: {
+    preset: "netlify",
+    // Sin esto Nitro vuelve a empaquetar firebase-admin y rompe el default export.
+    traceDeps: ["firebase-admin*"],
+  } as { preset: string },
+  vite: {
+    ssr: {
+      // El wrapper ESM de firebase-admin hace `import mod from "./app"` y lee mod.SDK_VERSION.
+      // Vite lo empaqueta como .default.SDK_VERSION, default queda undefined y el pago revienta en Netlify.
+      external: ["firebase-admin"],
+    },
+  },
 });

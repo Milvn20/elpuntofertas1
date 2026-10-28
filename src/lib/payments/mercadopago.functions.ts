@@ -6,17 +6,20 @@ import {
   isMercadoPagoConfigured,
   resolveSiteOrigin,
   preferenceRedirect,
+  serverEnv,
 } from "@/lib/payments/mercadopago-core";
 import { applyMercadoPagoPayment, fetchMercadoPagoPayment } from "@/lib/payments/webhook.server";
 
 function accessToken() {
-  return process.env.MERCADOPAGO_ACCESS_TOKEN?.trim() || "";
+  return serverEnv("MERCADOPAGO_ACCESS_TOKEN");
 }
 
 function siteOrigin() {
+  const request = getRequest();
   return resolveSiteOrigin(
-    { SITE_URL: process.env.SITE_URL, PUBLIC_SITE_URL: process.env.PUBLIC_SITE_URL },
-    getRequest()?.headers?.get("origin") ?? null,
+    { SITE_URL: serverEnv("SITE_URL"), PUBLIC_SITE_URL: serverEnv("PUBLIC_SITE_URL") },
+    request?.headers?.get("origin") ?? null,
+    request?.headers?.get("x-forwarded-host") || request?.headers?.get("host"),
   );
 }
 

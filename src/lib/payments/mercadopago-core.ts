@@ -37,10 +37,28 @@ export function isMercadoPagoConfigured(token: string) {
   return token.trim().length > 0;
 }
 
-export function resolveSiteOrigin(env: { SITE_URL?: string; PUBLIC_SITE_URL?: string }, requestOrigin: string | null) {
-  const configured = (env.SITE_URL || env.PUBLIC_SITE_URL || "").trim().replace(/\/$/, "");
-  if (configured) return configured;
-  if (requestOrigin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(requestOrigin)) return requestOrigin;
+/** Lectura en tiempo de ejecución. El acceso con punto lo puede vaciar el build de Vite. */
+export function serverEnv(name: string) {
+  const value = process.env[name];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export function resolveSiteOrigin(
+  env: { SITE_URL?: string; PUBLIC_SITE_URL?: string },
+  requestOrigin: string | null,
+  requestHost?: string | null,
+) {
+  const site = (env.SITE_URL || "").trim().replace(/\/$/, "");
+  if (/^https?:\/\//.test(site)) return site;
+
+  const origin = (requestOrigin || "").trim().replace(/\/$/, "");
+  if (/^https?:\/\//.test(origin)) return origin;
+
+  const host = (requestHost || "").split(",")[0]?.trim() ?? "";
+  if (host && !/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return `https://${host}`;
+
+  const pub = (env.PUBLIC_SITE_URL || "").trim().replace(/\/$/, "");
+  if (/^https?:\/\//.test(pub)) return pub;
   return "http://localhost:8080";
 }
 

@@ -2,6 +2,7 @@ import type { DocumentReference } from "firebase-admin/firestore";
 import {
   decidePaymentUpdate,
   paymentEventKey,
+  serverEnv,
   verifyWebhookSignature,
 } from "@/lib/payments/mercadopago-core";
 
@@ -144,7 +145,7 @@ export async function handleMercadoPagoWebhook(request: Request) {
   const paymentId = notificationId(url, body);
   if (!/^\d{1,20}$/.test(paymentId)) return Response.json({ ok: false }, { status: 400 });
 
-  const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET?.trim() || "";
+  const secret = serverEnv("MERCADOPAGO_WEBHOOK_SECRET");
   const valid = verifyWebhookSignature({
     signatureHeader: request.headers.get("x-signature"),
     requestId: request.headers.get("x-request-id"),
@@ -153,7 +154,7 @@ export async function handleMercadoPagoWebhook(request: Request) {
   });
   if (!valid) return Response.json({ ok: false }, { status: 401 });
 
-  const token = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim() || "";
+  const token = serverEnv("MERCADOPAGO_ACCESS_TOKEN");
   if (!token) return Response.json({ ok: false }, { status: 503 });
   const payment = await fetchMercadoPagoPayment(token, paymentId);
   if (!payment) return Response.json({ ok: false }, { status: 502 });

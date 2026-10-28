@@ -53,6 +53,8 @@ describe("preferencia de Mercado Pago", () => {
   it("arma el retorno con la URL pública y no con un dominio inventado", () => {
     expect(resolveSiteOrigin({ SITE_URL: "https://tienda.example" }, "http://localhost:8080")).toBe("https://tienda.example");
     expect(resolveSiteOrigin({}, "http://localhost:8080")).toBe("http://localhost:8080");
+    expect(resolveSiteOrigin({ PUBLIC_SITE_URL: "http://localhost:8080" }, "https://elpuntofertas.netlify.app")).toBe("https://elpuntofertas.netlify.app");
+    expect(resolveSiteOrigin({}, null, "elpuntofertas.netlify.app")).toBe("https://elpuntofertas.netlify.app");
     expect(returnUrls("http://localhost:8080").success).toBe("http://localhost:8080/pago/resultado");
     expect(preferenceRedirect("http://localhost:8080").auto_return).toBeUndefined();
     expect(preferenceRedirect("https://tienda.example").auto_return).toBe("approved");
